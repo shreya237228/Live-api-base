@@ -162,7 +162,24 @@ pnpm dev
    - **Note:** The FastAPI chart_api.py is provided for direct REST access to chart/wordcloud generation, but the main chat UI uses the WebSocket backend for tool calls.
 
 ---
+## Demo Instructions
 
+To try out the tools:
+1. Start the backend (`python live_api.py`)
+2. Run the frontend (`pnpm dev`)
+3. Go to `http://localhost:3000`
+4. Use the chat box to send:
+   - `What time is it?`
+   - `Weather in London`
+   - `Bar chart: 1,2,3`
+
+To test memory:
+1. Visit `/memory-demo`
+2. Use buttons to enable/disable memory
+3. Set a preference like `demo_name = Shreya`
+4. Verify changes in `memory_store.json`
+
+---
 ## Assignment Coverage
 
 - **All required tools implemented and demoable**
