@@ -5,11 +5,11 @@ import uuid
 from google import genai
 import base64
 from google.genai import types
-from google.genai.types import Content, Part, Tool, FunctionDeclaration
+from google.genai.types import Content, Part, Tool, FunctionDeclaration, FunctionResponse
 import requests
 
 from websockets.server import WebSocketServerProtocol
-import websockets.server
+import websockets
 import io
 from pydub import AudioSegment
 import datetime
@@ -55,6 +55,14 @@ def save_previous_session_handle(handle):
     with open('session_handle.json', 'w') as f:
         json.dump({'previous_session_handle': handle}, f)
 
+def clear_stale_session_handle():
+    """Remove any stored session handle so that a fresh session can be started on the next connection."""
+    try:
+        os.remove('session_handle.json')
+    except FileNotFoundError:
+        pass
+    global previous_session_handle
+    previous_session_handle = None
 
 previous_session_handle = load_previous_session_handle()
 
@@ -98,7 +106,7 @@ def calculator_tool(expr):
     try:
         # Parse the expression safely
         node = ast.parse(expr, mode='eval')
-        allowed_nodes = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Num, ast.Load, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.USub, ast.UAdd, ast.LParen, ast.RParen)
+        allowed_nodes = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant, ast.Load, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.USub, ast.UAdd)
         for n in ast.walk(node):
             if not isinstance(n, allowed_nodes):
                 return "Invalid or unsafe expression."
@@ -195,7 +203,7 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
         # print(f"Config data: {config_data}")
 
         config = types.LiveConnectConfig(
-            response_modalities=["AUDIO"],
+            response_modalities=[types.Modality.AUDIO],
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     # Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, and Zephyr.
@@ -226,12 +234,12 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                             if "realtime_input" in data:
                                 for chunk in data["realtime_input"]["media_chunks"]:
                                     if chunk["mime_type"] == "audio/pcm":
-                                        await session.send(input={
+                                        await session.send(input={  # type: ignore
                                             "mime_type": "audio/pcm",
                                             "data": chunk["data"]
                                         })
                                     elif chunk["mime_type"].startswith("image/"):
-                                        await session.send(input={
+                                        await session.send(input={  # type: ignore
                                             "mime_type": chunk["mime_type"],
                                             "data": chunk["data"]
                                         })
@@ -246,12 +254,11 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                         "text": f"The current time is: {tool_result}"
                                     }))
                                     continue  # Prevent sending to Gemini
-                                elif "weather" in text_content:
+                                elif (match := re.search(r"weather(?: in ([a-zA-Z\s]+))?", text_content)):
                                     print(f"Manual tool logic triggered for weather: {text_content}")
                                     # Try to extract city from message, e.g., 'weather in Paris'
-                                    match = re.search(r"weather(?: in ([a-zA-Z\s]+))?", text_content)
                                     city = DEFAULT_WEATHER_CITY
-                                    if match and match.group(1):
+                                    if match.group(1):
                                         city = match.group(1).strip().title()
                                     tool_result = weather_info_tool(city)
                                     await websocket.send(json.dumps({
@@ -262,8 +269,7 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                     print(f"Manual tool logic triggered for calculator: {text_content}")
                                     # Extract the expression after 'calculate' or use the whole message if it looks like math
                                     expr = text_content
-                                    calc_match = re.search(r"calculate (.+)", text_content)
-                                    if calc_match:
+                                    if (calc_match := re.search(r"calculate (.+)", text_content)):
                                         expr = calc_match.group(1)
                                     tool_result = calculator_tool(expr)
                                     await websocket.send(json.dumps({
@@ -279,8 +285,7 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                     await websocket.send(json.dumps({"carousel": "prev"}))
                                     continue  # Prevent sending to Gemini
                                 # Button control logic
-                                elif re.search(r"turn (on|off) (light 1|light 2|fan)", text_content):
-                                    match = re.search(r"turn (on|off) (light 1|light 2|fan)", text_content)
+                                elif (match := re.search(r"turn (on|off) (light 1|light 2|fan)", text_content)):
                                     state = match.group(1)
                                     name = match.group(2).title()
                                     print(f"Manual tool logic triggered for button: {name} {state}")
@@ -290,8 +295,11 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                 elif "word cloud" in text_content:
                                     print(f"Manual tool logic triggered for word cloud: {text_content}")
                                     # Extract text after 'word cloud' or 'generate word cloud'
-                                    wc_match = re.search(r"(?:word cloud|generate word cloud)(?: for|:)?\s*(.*)", text_content)
-                                    wc_text = wc_match.group(1) if wc_match and wc_match.group(1) else text_content
+                                    wc_text = text_content
+                                    if (wc_match := re.search(r"(?:word cloud|generate word cloud)(?: for|:)?\s*(.*)", text_content)):
+                                        if wc_match.group(1):
+                                            wc_text = wc_match.group(1)
+                                    
                                     base64_img = wordcloud_tool(wc_text)
                                     if base64_img:
                                         await websocket.send(json.dumps({"wordcloud": base64_img}))
@@ -301,8 +309,10 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                 # Bar chart tool logic
                                 elif "bar chart" in text_content:
                                     print(f"Manual tool logic triggered for bar chart: {text_content}")
-                                    nums_match = re.search(r"bar chart[:\s]+([\d,\s\.]+)", text_content)
-                                    nums = nums_match.group(1).replace(' ', '').split(',') if nums_match and nums_match.group(1) else []
+                                    nums = []
+                                    if (nums_match := re.search(r"bar chart[:\s]+([\d,\s\.]+)", text_content)):
+                                        if nums_match.group(1):
+                                            nums = nums_match.group(1).replace(' ', '').split(',')
                                     base64_img = barchart_tool(nums)
                                     if base64_img:
                                         await websocket.send(json.dumps({"barchart": base64_img}))
@@ -312,8 +322,10 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                 # Line chart tool logic
                                 elif "line chart" in text_content:
                                     print(f"Manual tool logic triggered for line chart: {text_content}")
-                                    nums_match = re.search(r"line chart[:\s]+([\d,\s\.]+)", text_content)
-                                    nums = nums_match.group(1).replace(' ', '').split(',') if nums_match and nums_match.group(1) else []
+                                    nums = []
+                                    if (nums_match := re.search(r"line chart[:\s]+([\d,\s\.]+)", text_content)):
+                                        if nums_match.group(1):
+                                            nums = nums_match.group(1).replace(' ', '').split(',')
                                     base64_img = linechart_tool(nums)
                                     if base64_img:
                                         await websocket.send(json.dumps({"linechart": base64_img}))
@@ -323,8 +335,10 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                 # Pie chart tool logic
                                 elif "pie chart" in text_content:
                                     print(f"Manual tool logic triggered for pie chart: {text_content}")
-                                    nums_match = re.search(r"pie chart[:\s]+([\d,\s\.]+)", text_content)
-                                    nums = nums_match.group(1).replace(' ', '').split(',') if nums_match and nums_match.group(1) else []
+                                    nums = []
+                                    if (nums_match := re.search(r"pie chart[:\s]+([\d,\s\.]+)", text_content)):
+                                        if nums_match.group(1):
+                                            nums = nums_match.group(1).replace(' ', '').split(',')
                                     base64_img = piechart_tool(nums)
                                     if base64_img:
                                         await websocket.send(json.dumps({"piechart": base64_img}))
@@ -380,13 +394,14 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                             print("receiving from gemini")
                             async for response in session.receive():
                                 # --- Tool call handling ---
-                                if hasattr(response, 'tool_request') and response.tool_request is not None:
-                                    tool_req = response.tool_request
+                                tool_req = getattr(response, "tool_request", None)
+                                if tool_req:
                                     if tool_req.name == "current_time":
                                         tool_result = current_time_tool()
                                         await session.send_tool_response(
-                                            name="current_time",
-                                            response=tool_result
+                                            function_responses=[
+                                                FunctionResponse(name="current_time", response={"result": tool_result})
+                                            ]
                                         )
                                         continue
                                 # --- End tool call handling ---
@@ -434,12 +449,12 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                     continue
 
                                 model_turn = response.server_content.model_turn
-                                if model_turn:
+                                if model_turn and model_turn.parts:
                                     for part in model_turn.parts:
                                         if hasattr(part, 'text') and part.text is not None:
                                             await websocket.send(json.dumps({"text": part.text}))
 
-                                        elif hasattr(part, 'inline_data') and part.inline_data is not None:
+                                        elif hasattr(part, 'inline_data') and part.inline_data and part.inline_data.data:
                                             try:
                                                 audio_data = part.inline_data.data
                                                 base64_audio = base64.b64encode(
@@ -487,7 +502,7 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
 
 async def main() -> None:
     # Use explicit IPv4 address and handle deprecation
-    server = await websockets.server.serve(
+    server = await websockets.serve(
         gemini_session_handler,
         host="0.0.0.0",  # Explicitly use IPv4 localhost
         port=9084,

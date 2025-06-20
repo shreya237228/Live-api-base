@@ -29,21 +29,19 @@ const AskAIWithSocket = ({ isOpen, onClose, setupInput, useCaseId }) => {
       </div>
 
       {/* Content */}
-      <div className="h-96">
+      <div style={{ minHeight: 600 }}>
         <WebSocketProvider
-          url="ws://0.0.0.0:9084"
-          setup={`You are a research assistant called 'AI'. You are trained by Consuma AI - An AI based market research company with a changing product called 'Rapid research platform', that lets users take research from months to minutes.
-
-        Always start the conversation by saying, 'Hey, I'm AI, what's on your mind?'
-        Be friendly & engaging. Don't always use long sentences. Keep it simple, crisp and be an easy going friend.
-        
-        Context for this conversation:
-        ${setupInput || "No specific context provided."}`}
+          url="ws://localhost:9084"
+          setup={{
+            system_prompt: "You are a helpful AI assistant.",
+            enable_audio: true,
+            voice_name: "Kore"
+          }}
           useCaseId={useCaseId}
           tools={[]}
           toolMappings={{}}
         >
-          <div className="p-4 h-full">
+          <div className="p-4">
             <ScreenShare />
           </div>
         </WebSocketProvider>

@@ -1,0 +1,63 @@
+Gemini Live API Assignment: LLM Tools & Memory Implementation
+
+Assignment Overview:
+This assignment focuses on implementing and demonstrating the usage of LLM Tools and Long-term Memory functionality within a Gemini-live API environment. You will build a system that allows Voice Agents to access various tools and maintain memory across interactions, using the template code provided.
+
+Main Objective: LLM Tools Implementation
+Core Requirement:
+Implement tools from each of the following categories:
+
+1. Generic Information Tools:
+- Current Time Tool: Retrieve and display current date/time
+- Weather Information: Get current weather data
+- Calculator: Perform mathematical operations
+
+2. Frontend Interaction Tools:
+- Carousel Navigation: Go to next/previous item in a carousel
+- Button Control: Toggle buttons based on actions (e.g., turn on/off lights)
+
+3. Data Visualization Tools:
+- Word Cloud Generator
+- Bar Chart Creator
+- Line Chart Creator
+- Pie Chart Creator
+
+Technical Requirements:
+- Tools must be visible on the frontend
+- Implement real-time communication between frontend and backend
+
+Secondary Objective: Memory Implementation
+Core Requirement:
+- Enable/Disable/Clear/Status check for memory
+- Support User Preferences, Context Memory, Knowledge Memory
+
+Key Evaluation Points:
+1. Reusable Tools Infrastructure (25 points)
+2. Code Quality (15 points)
+3. Demoable Examples (60 points) - Tools + Memory
+
+Project Structure:
+assignment-live-api/
+├── components/tools/
+├── components/memory/
+├── components/demonstrations/
+├── live-api-backend/tools/
+├── live-api-backend/memory/
+├── live-api-backend/websocket/
+├── lib/tools-registry.js
+├── lib/memory-client.js
+├── pages/tools-demo.js
+└── pages/memory-demo.js
+
+Submission Requirements:
+1. Loom Demo Video (5 mins): Overview, tool demos, memory demo, code walkthrough, architecture discussion
+2. GitHub Repository: Source code, README, API docs, demo instructions
+
+Bonus:
+- Tool composition
+- Memory analytics
+
+Useful References:
+- Template: https://github.com/Consuma/Live-api-base
+- Docs: https://ai.google.dev/gemini-api/docs/live
+- API key: https://aistudio.google.com/

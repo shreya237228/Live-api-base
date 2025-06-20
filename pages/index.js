@@ -3,6 +3,7 @@ import AskAIWithSocket from "../components/ask-ai-with-socket";
 import { useToolRegistry } from "../ai-tools/ask-ai";
 
 export default function Home() {
+  console.log("Home page rendered");
   const [isAskAIOpen, setIsAskAIOpen] = useState(true); // Start with chat open
   const { clearAllTools } = useToolRegistry();
 
@@ -146,7 +147,7 @@ export default function Home() {
                 <AskAIWithSocket
                   isOpen={isAskAIOpen}
                   onClose={() => setIsAskAIOpen(false)}
-                  setupInput="You are AI, a friendly AI assistant. Keep responses concise and helpful."
+                  setupInput="You are a market research expert."
                   useCaseId="assignment-demo"
                 />
               </div>

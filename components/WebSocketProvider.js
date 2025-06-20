@@ -22,9 +22,11 @@ export const WebSocketProvider = ({
   toolMappings = {},
   startAutomatically = true,
 }) => {
+  console.log("WebSocketProvider mounted");
   const [isConnected, setIsConnected] = useState(false);
   const [playbackAudioLevel, setPlaybackAudioLevel] = useState(0);
   const [lastTranscription, setLastTranscription] = useState(null);
+  const [lastTextMessage, setLastTextMessage] = useState(null);
   const [lastAudioData, setLastAudioData] = useState(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef();
@@ -96,6 +98,7 @@ export const WebSocketProvider = ({
     setIsConnected(false);
     setPlaybackAudioLevel(0);
     setLastTranscription(null);
+    setLastTextMessage(null);
     setLastAudioData(null);
 
     // Reset reconnection attempts
@@ -106,20 +109,21 @@ export const WebSocketProvider = ({
 
   // Initialize audio context for playback
   const initAudioContext = useCallback(() => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext({
-        sampleRate: 24000, // Match the server's 24kHz sample rate
-      });
+    try {
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 24000,
+          latencyHint: 'interactive'
+        });
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        void audioContextRef.current.resume();
+      }
+      return audioContextRef.current;
+    } catch (error) {
+      console.error('Failed to initialize audio context:', error);
+      throw error;
     }
-
-    // Resume audio context if it's suspended (required for some browsers)
-    if (audioContextRef.current.state === "suspended") {
-      audioContextRef.current.resume().catch((error) => {
-        console.warn("Failed to resume audio context:", error);
-      });
-    }
-
-    return audioContextRef.current;
   }, []);
 
   const connect = () => {
@@ -146,6 +150,7 @@ export const WebSocketProvider = ({
     try {
       const ws = new WebSocket(url);
       wsRef.current = ws;
+      console.log("WebSocket created:", url);
 
       // Set connection timeout
       connectionTimeoutRef.current = setTimeout(() => {
@@ -202,42 +207,69 @@ export const WebSocketProvider = ({
         ws.close();
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log("Received message:", data);
 
-          if (data.transcription) {
-            setLastTranscription({
-              text: data.transcription.text,
-              sender: data.transcription.sender,
-              finished: data.transcription.finished,
-            });
-          }
-
-          if (data.interrupted) {
-            // Stop current audio playback and clear buffer
-            console.log(
-              "Received interruption signal, stopping audio playback"
-            );
-            onClientInterrupt();
+          if (data.text) {
+            setLastTextMessage(data.text);
           }
 
           if (data.audio) {
-            setLastAudioData(data.audio);
-            const audioBuffer = Base64.toUint8Array(data.audio);
-            const now = Date.now();
-            const newChunk = {
-              data: [audioBuffer.buffer],
-              startTimestamp: now,
-            };
-            audioBufferQueueRef.current.push(newChunk);
+            console.log("Received audio data");
+            try {
+              const audioContext = initAudioContext();
+              console.log("Audio context initialized:", audioContext.state);
+
+              // Decode base64 audio data
+              const audioData = Base64.toUint8Array(data.audio);
+              console.log("Decoded audio data length:", audioData.length);
+
+              // Create audio buffer from raw data
+              const audioBuffer = await audioContext.decodeAudioData(audioData.buffer);
+              console.log("Created audio buffer:", audioBuffer.duration, "seconds");
+
+              // Create and configure source node
+              const source = audioContext.createBufferSource();
+              source.buffer = audioBuffer;
+
+              // Create and configure gain node for volume control
+              const gainNode = audioContext.createGain();
+              gainNode.gain.value = 1.0; // Increase volume
+
+              // Connect nodes
+              source.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+
+              // Store the current source
+              if (currentAudioSourceRef.current) {
+                currentAudioSourceRef.current.stop();
+              }
+              currentAudioSourceRef.current = source;
+
+              // Play the audio
+              source.start(0);
+              console.log("Started audio playback");
+
+              // Update state
+              setLastAudioData(data.audio);
+            } catch (error) {
+              console.error("Error playing audio:", error);
+              console.error(error.stack);
+            }
           }
 
-          if (data.tool_call_requests) {
-            handleToolCalls(data.tool_call_requests);
+          if (data.transcription) {
+            setLastTranscription(data.transcription);
+          }
+
+          // Handle tool responses
+          if (data.tool_response) {
+            handleToolCalls(data.tool_response);
           }
         } catch (error) {
-          console.error("Error handling message:", error);
+          console.error("Error handling WebSocket message:", error);
         }
       };
     } catch (error) {
@@ -294,6 +326,9 @@ export const WebSocketProvider = ({
       return new Promise((resolve, reject) => {
         try {
           const ctx = initAudioContext();
+          if (ctx.state === 'suspended') {
+            void ctx.resume();
+          }
           console.log("Playing audio");
 
           const totalLength = audioBuffers.reduce(
@@ -301,7 +336,10 @@ export const WebSocketProvider = ({
             0
           );
 
+          console.log("Total audio length:", totalLength);
+
           if (totalLength === 0) {
+            console.warn("Empty audio buffer received");
             return resolve();
           }
 
@@ -324,7 +362,7 @@ export const WebSocketProvider = ({
           const source = ctx.createBufferSource();
           currentAudioSourceRef.current = source;
           const gainNode = ctx.createGain();
-          gainNode.gain.value = 1.5;
+          gainNode.gain.value = 2.0; // Increased volume
 
           source.buffer = audioBuffer;
           source.connect(gainNode);
@@ -333,6 +371,7 @@ export const WebSocketProvider = ({
           const durationMs =
             (audioBuffer.length / audioBuffer.sampleRate) * 1000;
 
+          console.log("Starting audio playback, duration:", durationMs, "ms");
           source.start();
 
           // Simple audio level simulation
@@ -470,6 +509,7 @@ export const WebSocketProvider = ({
         sendMessage,
         sendMediaChunk,
         lastTranscription,
+        lastTextMessage,
         lastAudioData,
         isConnected,
         playbackAudioLevel,

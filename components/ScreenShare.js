@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import { Card, CardContent } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useWebSocket } from "./WebSocketProvider";
 import { Base64 } from "js-base64";
 import { Send, Play, Square } from "lucide-react";
+import Carousel from "./ui/carousel";
 
 const ScreenShare = () => {
   const audioContextRef = useRef(null);
@@ -30,9 +31,40 @@ const ScreenShare = () => {
     isConnected,
     playbackAudioLevel,
     lastTranscription,
+    lastTextMessage,
     onClientInterrupt,
     disconnect,
   } = useWebSocket();
+
+  const carouselItems = [
+    { image: "https://placekitten.com/300/200", text: "Cute Kitten 1" },
+    { image: "https://placekitten.com/301/200", text: "Cute Kitten 2" },
+    { text: "Just some text, no image!" },
+    { image: "https://placekitten.com/302/200", text: "Cute Kitten 3" },
+    { text: "Another text-only slide." },
+  ];
+  const carouselRef = useRef();
+
+  // Button Control State
+  const [buttonStates, setButtonStates] = useState({
+    "Light 1": false,
+    "Light 2": false,
+    "Fan": false,
+  });
+
+  // Word Cloud State
+  const [wordCloudImg, setWordCloudImg] = useState(null);
+
+  // Chart States
+  const [barChartImg, setBarChartImg] = useState(null);
+  const [lineChartImg, setLineChartImg] = useState(null);
+  const [pieChartImg, setPieChartImg] = useState(null);
+
+  // Memory Management State
+  const [memoryStatus, setMemoryStatus] = useState(null);
+  const [prefKey, setPrefKey] = useState("");
+  const [prefValue, setPrefValue] = useState("");
+  const [prefResult, setPrefResult] = useState(null);
 
   // Helper function to generate consistent timestamps
   const generateTimestamp = () => {
@@ -102,6 +134,22 @@ const ScreenShare = () => {
       });
     }
   }, [lastTranscription]);
+
+  // Handle incoming text messages (tool responses or Gemini text)
+  useEffect(() => {
+    console.log("lastTextMessage (ScreenShare):", lastTextMessage);
+    if (lastTextMessage && lastTextMessage.trim() !== "") {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: lastTextMessage,
+          sender: lastTextMessage.includes("The current time is") ? "Tool" : "Gemini",
+          timestamp: generateTimestamp(),
+          isComplete: true,
+        },
+      ]);
+    }
+  }, [lastTextMessage]);
 
   useEffect(() => {
     if (isConnected) {
@@ -232,6 +280,75 @@ const ScreenShare = () => {
     }
   };
 
+  // Listen for carousel navigation commands from WebSocket
+  useEffect(() => {
+    const wsHandler = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.carousel === "next") {
+          carouselRef.current?.goToNext();
+        } else if (data.carousel === "prev") {
+          carouselRef.current?.goToPrev();
+        }
+      } catch {}
+    };
+    if (window && window.WebSocket && window.ws) {
+      window.ws.addEventListener("message", wsHandler);
+    }
+    return () => {
+      if (window && window.WebSocket && window.ws) {
+        window.ws.removeEventListener("message", wsHandler);
+      }
+    };
+  }, []);
+
+  // Handle WebSocket button control and word cloud messages
+  useEffect(() => {
+    const wsHandler = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.button && data.button.name && data.button.state) {
+          setButtonStates((prev) => ({
+            ...prev,
+            [data.button.name]: data.button.state === "on",
+          }));
+        }
+        if (data.wordcloud) {
+          setWordCloudImg(data.wordcloud);
+        }
+        if (data.barchart) {
+          setBarChartImg(data.barchart);
+        }
+        if (data.linechart) {
+          setLineChartImg(data.linechart);
+        }
+        if (data.piechart) {
+          setPieChartImg(data.piechart);
+        }
+        if (data.memory_status) {
+          setMemoryStatus(data.memory_status);
+        }
+        if (data.memory_value !== undefined) {
+          setPrefResult(data.memory_value);
+        }
+        // Carousel handler (keep existing)
+        if (data.carousel === "next") {
+          carouselRef.current?.goToNext();
+        } else if (data.carousel === "prev") {
+          carouselRef.current?.goToPrev();
+        }
+      } catch {}
+    };
+    if (window && window.WebSocket && window.ws) {
+      window.ws.addEventListener("message", wsHandler);
+    }
+    return () => {
+      if (window && window.WebSocket && window.ws) {
+        window.ws.removeEventListener("message", wsHandler);
+      }
+    };
+  }, []);
+
   return (
     <div className="h-full flex flex-col">
       {/* Chat Messages */}
@@ -263,91 +380,276 @@ const ScreenShare = () => {
         </ScrollArea>
       </div>
 
+      {/* Demo Sections */}
+      <div className="space-y-6 my-4">
+        {/* Carousel */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Carousel Demo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Carousel ref={carouselRef} items={carouselItems} />
+          </CardContent>
+        </Card>
+
+        {/* Button Control */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Button Control Demo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 justify-center flex-wrap">
+              {Object.entries(buttonStates).map(([name, state]) => (
+                <Button
+                  key={name}
+                  variant={state ? "default" : "outline"}
+                  className={state ? "bg-green-500 text-white" : "bg-gray-200 dark:bg-gray-700"}
+                  disabled
+                >
+                  {name}: {state ? "ON" : "OFF"}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Word Cloud */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Word Cloud Demo</CardTitle>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            {wordCloudImg ? (
+              <img
+                src={`data:image/png;base64,${wordCloudImg}`}
+                alt="Word Cloud"
+                className="border rounded shadow max-w-full"
+                style={{ maxHeight: 200 }}
+              />
+            ) : (
+              <div className="text-gray-500">No word cloud generated yet.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Charts */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Chart Demos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="font-semibold mb-2">Bar Chart</p>
+                {barChartImg ? (
+                  <img
+                    src={`data:image/png;base64,${barChartImg}`}
+                    alt="Bar Chart"
+                    className="mx-auto border rounded shadow max-w-full"
+                    style={{ maxHeight: 200 }}
+                  />
+                ) : (
+                  <p className="text-gray-500 text-sm">No bar chart yet.</p>
+                )}
+              </div>
+              <div className="text-center">
+                <p className="font-semibold mb-2">Line Chart</p>
+                {lineChartImg ? (
+                  <img
+                    src={`data:image/png;base64,${lineChartImg}`}
+                    alt="Line Chart"
+                    className="mx-auto border rounded shadow max-w-full"
+                    style={{ maxHeight: 200 }}
+                  />
+                ) : (
+                  <p className="text-gray-500 text-sm">No line chart yet.</p>
+                )}
+              </div>
+              <div className="text-center">
+                <p className="font-semibold mb-2">Pie Chart</p>
+                {pieChartImg ? (
+                  <img
+                    src={`data:image/png;base64,${pieChartImg}`}
+                    alt="Pie Chart"
+                    className="mx-auto border rounded shadow max-w-full"
+                    style={{ maxHeight: 200 }}
+                  />
+                ) : (
+                  <p className="text-gray-500 text-sm">No pie chart yet.</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Memory Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Memory Management</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 justify-center mb-4 flex-wrap">
+              <Button onClick={() => sendMessage({ memory: "enable" })}>Enable Memory</Button>
+              <Button onClick={() => sendMessage({ memory: "disable" })}>Disable Memory</Button>
+              <Button onClick={() => sendMessage({ memory: "clear" })}>Clear Memory</Button>
+              <Button onClick={() => sendMessage({ memory: "status" })}>Status</Button>
+            </div>
+
+            {memoryStatus && (
+              <div className="mb-4">
+                <pre className="bg-gray-100 dark:bg-gray-800 rounded p-2 text-sm overflow-x-auto">
+                  {typeof memoryStatus === "string"
+                    ? memoryStatus
+                    : JSON.stringify(memoryStatus, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Preference Key"
+                  value={prefKey}
+                  onChange={(e) => setPrefKey(e.target.value)}
+                  className="px-2 py-1 border rounded text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Preference Value"
+                  value={prefValue}
+                  onChange={(e) => setPrefValue(e.target.value)}
+                  className="px-2 py-1 border rounded text-sm"
+                />
+                <Button
+                  onClick={() => {
+                    if (prefKey && prefValue) {
+                      sendMessage({ memory: "set_preference", key: prefKey, value: prefValue });
+                    }
+                  }}
+                >
+                  Set Preference
+                </Button>
+              </div>
+
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Preference Key"
+                  value={prefKey}
+                  onChange={(e) => setPrefKey(e.target.value)}
+                  className="px-2 py-1 border rounded text-sm"
+                />
+                <Button
+                  onClick={() => {
+                    if (prefKey) {
+                      sendMessage({ memory: "get_preference", key: prefKey });
+                    }
+                  }}
+                >
+                  Get Preference
+                </Button>
+              </div>
+
+              {prefResult !== null && (
+                <div className="text-center text-sm mt-2">
+                  Preference Value: <span className="font-mono">{String(prefResult)}</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Audio Controls */}
-      <div className="flex items-center gap-4 mb-4 flex-wrap">
-        <Button
-          onClick={isSharing ? endConversation : startConversation}
-          disabled={!isConnected}
-          variant={isSharing ? "destructive" : "default"}
-          className="flex items-center gap-2 text-xs"
-        >
-          {isSharing ? (
-            <>
-              <Square size={14} />
-              Stop
-            </>
-          ) : (
-            <>
-              <Play size={14} />
-              Start
-            </>
-          )}
-        </Button>
+      <Card className="my-4">
+        <CardContent>
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
+            <Button
+              onClick={isSharing ? endConversation : startConversation}
+              disabled={!isConnected}
+              variant={isSharing ? "destructive" : "default"}
+              className="flex items-center gap-2 text-xs"
+            >
+              {isSharing ? (
+                <>
+                  <Square size={14} />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <Play size={14} />
+                  Start
+                </>
+              )}
+            </Button>
 
-        {isSharing && (
-          <Button
-            onClick={fullDisconnect}
-            variant="destructive"
-            className="flex items-center gap-2 text-xs"
-          >
-            <Square size={14} />
-            End Conversation
-          </Button>
-        )}
+            {isSharing && (
+              <Button
+                onClick={fullDisconnect}
+                variant="destructive"
+                className="flex items-center gap-2 text-xs"
+              >
+                <Square size={14} />
+                End Conversation
+              </Button>
+            )}
 
-        {/* Connection Status */}
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
-          />
-          <span className="text-xs">
-            {isConnected ? "Connected" : "Disconnected"}
-          </span>
-        </div>
+            {/* Connection Status */}
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
+              <span className="text-xs">
+                {isConnected ? "Connected" : "Disconnected"}
+              </span>
+            </div>
 
-        {/* Audio Level Indicators */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs">Mic:</span>
-          <div className="w-16 h-1 bg-gray-200 rounded">
-            <div
-              className="h-full bg-green-500 rounded transition-all duration-300"
-              style={{ width: `${Math.min(100, audioLevel)}%` }}
-            />
+            {/* Audio Level Indicators */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs">Mic:</span>
+              <div className="w-16 h-1 bg-gray-200 rounded">
+                <div
+                  className="h-full bg-green-500 rounded transition-all duration-300"
+                  style={{ width: `${Math.min(100, audioLevel)}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs">Speaker:</span>
+              <div className="w-16 h-1 bg-gray-200 rounded">
+                <div
+                  className="h-full bg-blue-500 rounded transition-all duration-300"
+                  style={{ width: `${Math.min(100, playbackAudioLevel)}%` }}
+                />
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs">Speaker:</span>
-          <div className="w-16 h-1 bg-gray-200 rounded">
-            <div
-              className="h-full bg-blue-500 rounded transition-all duration-300"
-              style={{ width: `${Math.min(100, playbackAudioLevel)}%` }}
+          {/* Text Input */}
+          <div className="flex gap-2 w-full">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+              disabled={!isConnected}
             />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!isConnected || !inputText.trim()}
+              className="px-4"
+            >
+              <Send size={14} />
+            </Button>
           </div>
-        </div>
-      </div>
-
-      {/* Text Input */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message..."
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
-          disabled={!isConnected}
-        />
-        <Button
-          onClick={handleSendMessage}
-          disabled={!isConnected || !inputText.trim()}
-          className="px-4"
-        >
-          <Send size={14} />
-        </Button>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
