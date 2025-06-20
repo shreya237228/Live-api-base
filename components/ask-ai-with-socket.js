@@ -3,8 +3,10 @@ import { X } from "lucide-react";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { WebSocketProvider } from "./WebSocketProvider";
 import ScreenShare from "./ScreenShare";
+import { useToolRegistry } from "../ai-tools/ask-ai";
 
 const AskAIWithSocket = ({ isOpen, onClose, setupInput, useCaseId }) => {
+  const { getRegisteredTools, getRegisteredToolMappings } = useToolRegistry();
   if (!isOpen) return null;
 
   return (
@@ -38,8 +40,8 @@ const AskAIWithSocket = ({ isOpen, onClose, setupInput, useCaseId }) => {
             voice_name: "Kore"
           }}
           useCaseId={useCaseId}
-          tools={[]}
-          toolMappings={{}}
+          tools={getRegisteredTools()}
+          toolMappings={getRegisteredToolMappings()}
         >
           <div className="p-4">
             <ScreenShare />

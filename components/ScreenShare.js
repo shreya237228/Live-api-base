@@ -60,12 +60,6 @@ const ScreenShare = () => {
   const [lineChartImg, setLineChartImg] = useState(null);
   const [pieChartImg, setPieChartImg] = useState(null);
 
-  // Memory Management State
-  const [memoryStatus, setMemoryStatus] = useState(null);
-  const [prefKey, setPrefKey] = useState("");
-  const [prefValue, setPrefValue] = useState("");
-  const [prefResult, setPrefResult] = useState(null);
-
   // Helper function to generate consistent timestamps
   const generateTimestamp = () => {
     return new Date().toLocaleTimeString("en-US", {
@@ -325,12 +319,6 @@ const ScreenShare = () => {
         if (data.piechart) {
           setPieChartImg(data.piechart);
         }
-        if (data.memory_status) {
-          setMemoryStatus(data.memory_status);
-        }
-        if (data.memory_value !== undefined) {
-          setPrefResult(data.memory_value);
-        }
         // Carousel handler (keep existing)
         if (data.carousel === "next") {
           carouselRef.current?.goToNext();
@@ -478,84 +466,6 @@ const ScreenShare = () => {
                   <p className="text-gray-500 text-sm">No pie chart yet.</p>
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Memory Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Memory Management</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 justify-center mb-4 flex-wrap">
-              <Button onClick={() => sendMessage({ memory: "enable" })}>Enable Memory</Button>
-              <Button onClick={() => sendMessage({ memory: "disable" })}>Disable Memory</Button>
-              <Button onClick={() => sendMessage({ memory: "clear" })}>Clear Memory</Button>
-              <Button onClick={() => sendMessage({ memory: "status" })}>Status</Button>
-            </div>
-
-            {memoryStatus && (
-              <div className="mb-4">
-                <pre className="bg-gray-100 dark:bg-gray-800 rounded p-2 text-sm overflow-x-auto">
-                  {typeof memoryStatus === "string"
-                    ? memoryStatus
-                    : JSON.stringify(memoryStatus, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex gap-2 flex-wrap">
-                <input
-                  type="text"
-                  placeholder="Preference Key"
-                  value={prefKey}
-                  onChange={(e) => setPrefKey(e.target.value)}
-                  className="px-2 py-1 border rounded text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Preference Value"
-                  value={prefValue}
-                  onChange={(e) => setPrefValue(e.target.value)}
-                  className="px-2 py-1 border rounded text-sm"
-                />
-                <Button
-                  onClick={() => {
-                    if (prefKey && prefValue) {
-                      sendMessage({ memory: "set_preference", key: prefKey, value: prefValue });
-                    }
-                  }}
-                >
-                  Set Preference
-                </Button>
-              </div>
-
-              <div className="flex gap-2 mt-2 flex-wrap">
-                <input
-                  type="text"
-                  placeholder="Preference Key"
-                  value={prefKey}
-                  onChange={(e) => setPrefKey(e.target.value)}
-                  className="px-2 py-1 border rounded text-sm"
-                />
-                <Button
-                  onClick={() => {
-                    if (prefKey) {
-                      sendMessage({ memory: "get_preference", key: prefKey });
-                    }
-                  }}
-                >
-                  Get Preference
-                </Button>
-              </div>
-
-              {prefResult !== null && (
-                <div className="text-center text-sm mt-2">
-                  Preference Value: <span className="font-mono">{String(prefResult)}</span>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>

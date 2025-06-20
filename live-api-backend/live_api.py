@@ -21,6 +21,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# --- Memory module import ---
+from memory import enable_memory, disable_memory, clear_memory, get_memory_status, set_preference, get_preference
+
 load_dotenv()
 
 # Load API key from environment
@@ -179,22 +182,6 @@ def piechart_tool(numbers):
     ax.set_title("Pie Chart")
     return _chart_encode(fig)
 
-MEMORY_FILE = "memory_store.json"
-
-def load_memory():
-    try:
-        with open(MEMORY_FILE, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {"enabled": False, "preferences": {}, "context": {}, "knowledge": {}}
-
-def save_memory(mem):
-    with open(MEMORY_FILE, "w") as f:
-        json.dump(mem, f)
-
-# Initialize memory
-memory = load_memory()
-
 async def gemini_session_handler(websocket: WebSocketServerProtocol):
     print(f"Starting Gemini session")
     try:
@@ -246,6 +233,33 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
 
                             elif "text" in data:
                                 text_content = data["text"].lower()
+                                # --- Memory management logic ---
+                                if "memory" in data:
+                                    mem_cmd = data["memory"]
+                                    if mem_cmd == "enable":
+                                        mem = enable_memory()
+                                        await websocket.send(json.dumps({"memory_status": "enabled", "memory": mem}))
+                                    elif mem_cmd == "disable":
+                                        mem = disable_memory()
+                                        await websocket.send(json.dumps({"memory_status": "disabled", "memory": mem}))
+                                    elif mem_cmd == "clear":
+                                        mem = clear_memory()
+                                        await websocket.send(json.dumps({"memory_status": "cleared", "memory": mem}))
+                                    elif mem_cmd == "status":
+                                        mem = get_memory_status()
+                                        await websocket.send(json.dumps({"memory_status": mem}))
+                                    elif mem_cmd == "set_preference":
+                                        key = data.get("key")
+                                        value = data.get("value")
+                                        if key is not None:
+                                            mem = set_preference(key, value)
+                                            await websocket.send(json.dumps({"memory_status": f"preference set: {key}={value}", "memory": mem}))
+                                    elif mem_cmd == "get_preference":
+                                        key = data.get("key")
+                                        value = get_preference(key)
+                                        await websocket.send(json.dumps({"memory_value": value}))
+                                    continue  # Prevent sending to Gemini
+                                # --- End memory management logic ---
                                 # Manual tool interception for 'time', 'weather', 'calculator', carousel, and button control
                                 if "time" in text_content:
                                     print(f"Manual tool logic triggered for message: {text_content}")
@@ -344,36 +358,6 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                                         await websocket.send(json.dumps({"piechart": base64_img}))
                                     else:
                                         await websocket.send(json.dumps({"text": "Failed to generate pie chart."}))
-                                    continue  # Prevent sending to Gemini
-                                # Memory management logic
-                                elif "memory" in data:
-                                    mem_cmd = data["memory"]
-                                    global memory
-                                    if mem_cmd == "enable":
-                                        memory["enabled"] = True
-                                        save_memory(memory)
-                                        await websocket.send(json.dumps({"memory_status": "enabled"}))
-                                    elif mem_cmd == "disable":
-                                        memory["enabled"] = False
-                                        save_memory(memory)
-                                        await websocket.send(json.dumps({"memory_status": "disabled"}))
-                                    elif mem_cmd == "clear":
-                                        memory = {"enabled": memory.get("enabled", False), "preferences": {}, "context": {}, "knowledge": {}}
-                                        save_memory(memory)
-                                        await websocket.send(json.dumps({"memory_status": "cleared"}))
-                                    elif mem_cmd == "status":
-                                        await websocket.send(json.dumps({"memory_status": memory}))
-                                    elif mem_cmd == "set_preference":
-                                        key = data.get("key")
-                                        value = data.get("value")
-                                        if key:
-                                            memory["preferences"][key] = value
-                                            save_memory(memory)
-                                            await websocket.send(json.dumps({"memory_status": f"preference set: {key}={value}"}))
-                                    elif mem_cmd == "get_preference":
-                                        key = data.get("key")
-                                        value = memory["preferences"].get(key)
-                                        await websocket.send(json.dumps({"memory_value": value}))
                                     continue  # Prevent sending to Gemini
                                 else:
                                     await session.send_client_content(
