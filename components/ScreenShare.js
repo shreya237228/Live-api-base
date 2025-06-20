@@ -308,16 +308,16 @@ const ScreenShare = () => {
           }));
         }
         if (data.wordcloud) {
-          setWordCloudImg(data.wordcloud);
+          setWordCloudImg("data:image/png;base64," + data.wordcloud);
         }
         if (data.barchart) {
-          setBarChartImg(data.barchart);
+          setBarChartImg("data:image/png;base64," + data.barchart);
         }
         if (data.linechart) {
-          setLineChartImg(data.linechart);
+          setLineChartImg("data:image/png;base64," + data.linechart);
         }
         if (data.piechart) {
-          setPieChartImg(data.piechart);
+          setPieChartImg("data:image/png;base64," + data.piechart);
         }
         // Carousel handler (keep existing)
         if (data.carousel === "next") {
@@ -409,7 +409,7 @@ const ScreenShare = () => {
           <CardContent className="flex justify-center">
             {wordCloudImg ? (
               <img
-                src={`data:image/png;base64,${wordCloudImg}`}
+                src={wordCloudImg}
                 alt="Word Cloud"
                 className="border rounded shadow max-w-full"
                 style={{ maxHeight: 200 }}
@@ -431,7 +431,7 @@ const ScreenShare = () => {
                 <p className="font-semibold mb-2">Bar Chart</p>
                 {barChartImg ? (
                   <img
-                    src={`data:image/png;base64,${barChartImg}`}
+                    src={barChartImg}
                     alt="Bar Chart"
                     className="mx-auto border rounded shadow max-w-full"
                     style={{ maxHeight: 200 }}
@@ -444,7 +444,7 @@ const ScreenShare = () => {
                 <p className="font-semibold mb-2">Line Chart</p>
                 {lineChartImg ? (
                   <img
-                    src={`data:image/png;base64,${lineChartImg}`}
+                    src={lineChartImg}
                     alt="Line Chart"
                     className="mx-auto border rounded shadow max-w-full"
                     style={{ maxHeight: 200 }}
@@ -457,7 +457,7 @@ const ScreenShare = () => {
                 <p className="font-semibold mb-2">Pie Chart</p>
                 {pieChartImg ? (
                   <img
-                    src={`data:image/png;base64,${pieChartImg}`}
+                    src={pieChartImg}
                     alt="Pie Chart"
                     className="mx-auto border rounded shadow max-w-full"
                     style={{ maxHeight: 200 }}
