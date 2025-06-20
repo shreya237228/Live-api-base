@@ -105,6 +105,8 @@ Live-api-base/
 - **Persistence**: All memory is stored in `live-api-backend/memory_store.json` via `memory.py`.
 - **Context/Knowledge**: Structure is present, but only preferences are actively demoed.
 
+- This section is meant to show memory persistence using WebSocket messages that update a JSON file on the backend. The backend handlers are in place and the file system is ready, but due to a missing response handler in the frontend, the result isn’t currently visible in the browser
+
 ---
 
 ## How to Run
