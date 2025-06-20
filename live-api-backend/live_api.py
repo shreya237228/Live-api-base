@@ -393,6 +393,7 @@ async def gemini_session_handler(websocket: WebSocketServerProtocol):
                         try:
                             print("receiving from gemini")
                             async for response in session.receive():
+                                print(f"GEMINI RAW RESPONSE: {response}")
                                 # --- Tool call handling ---
                                 tool_req = getattr(response, "tool_request", None)
                                 if tool_req:
