@@ -138,14 +138,13 @@ pnpm dev
 ## Future Fix: Known Issues & Troubleshooting
 
 1. **Bar Chart/Line Chart/Pie Chart Not Displaying**
-   - **Symptom:** You send "bar chart: 1,2,3" but see no image or get an audio error.
-   - **Cause:** The frontend may try to decode all incoming messages as audio, even if they are images. Only decode audio fields as audio.
-   - **Fix:** Update your WebSocket handler to only decode audio if the message contains a valid audio field. Chart images are sent as barchart, linechart, etc.
+   - **Symptom:** "bar chart: 1,2,3" goes through but see no image or get an audio error.
+   - **Fix:** Update the WebSocket handler to only decode audio if the message contains a valid audio field. Chart images are sent as barchart, linechart, etc.
 
 2. **WebSocket Disconnected**
    - **Symptom:** "WebSocket: Disconnected" in UI.
    - **Cause:** Backend not running, wrong port, or CORS issue.
-   - **Fix:** Ensure backend is running on ws://localhost:9084 and CORS is allowed.
+   - **Fix:** Need to ensure backend is running on ws://localhost:9084 and CORS is allowed.
 
 3. **No Memory Response**
    - **Symptom:** Memory commands sent, but no response in log.
