@@ -200,11 +200,6 @@ To test memory:
 
 ---
 
-## For Instructors/Graders
-
-- **To test memory**: Use `/memory-demo` to enable/disable/clear/status and set/get preferences.
-- **To test charts/wordclouds**: Use chat UI or call REST API endpoints directly.
-- **For troubleshooting**: See "Known Issues" above.
 
 ---
 
