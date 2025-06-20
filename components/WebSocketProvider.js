@@ -18,43 +18,10 @@ export const WebSocketProvider = ({
   url,
   setup = {},
   useCaseId = null,
+  tools = [],
+  toolMappings = {},
   startAutomatically = true,
 }) => {
-  console.log("WebSocketProvider mounted");
-
-  // 🔧 Tool configuration moved inside
-  const tools = [
-    { name: "carousel_next" },
-    { name: "weather_info_tool" },
-    { name: "math_tool" },
-    { name: "time_tool" },
-    { name: "greet" }
-    // Add any more tools here
-  ];
-
-  const toolMappings = {
-    carousel_next: async () => {
-      console.log("carousel_next tool triggered");
-      return "carousel moved";
-    },
-    weather_info_tool: async ({ city }) => {
-      // Simple dummy implementation
-      return `The weather in ${city} is sunny.`;
-    },
-    math_tool: async ({ expression }) => {
-      try {
-        return eval(expression); // 🔥 Use with caution; for demo only
-      } catch {
-        return "Invalid math expression.";
-      }
-    },
-    time_tool: async () => {
-      return new Date().toLocaleTimeString();
-    },
-    greet: async ({ name }) => {
-      return `Hello, ${name || "friend"}!`;
-    }
-  }; => {
   console.log("WebSocketProvider mounted");
   const [isConnected, setIsConnected] = useState(false);
   const [playbackAudioLevel, setPlaybackAudioLevel] = useState(0);
@@ -242,75 +209,69 @@ export const WebSocketProvider = ({
 
       ws.onmessage = async (event) => {
         try {
-          if (typeof event.data === "string") {
-            console.log("audio_base64 in message?", !!data.audio_base64, data.audio_base64?.slice?.(0, 30));
+          const data = JSON.parse(event.data);
+          console.log("Received message:", data);
 
-            // Message is JSON
-            const data = JSON.parse(event.data);
-            console.log("Received JSON message:", data);
-      
-            if (data.text) setLastTextMessage(data.text);
-            if (data.transcription) setLastTranscription(data.transcription);
-      
-            if (data.audio_base64) {
-              try {
-                const audioContext = initAudioContext();
-                const audioData = Base64.toUint8Array(data.audio_base64);
-                const audioBuffer = await audioContext.decodeAudioData(audioData.buffer);
-                const source = audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                const gainNode = audioContext.createGain();
-                gainNode.gain.value = 1.0;
-                source.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-      
-                if (currentAudioSourceRef.current) {
-                  currentAudioSourceRef.current.stop();
-                }
-      
-                currentAudioSourceRef.current = source;
-                source.start(0);
-                setLastAudioData(data.audio_base64);
-              } catch (err) {
-                console.error("Error decoding audio_base64:", err);
-              }
-            }
-      
-            if (data.tool_response) {
-              handleToolCalls(data.tool_response);
-            }
-      
-          } else if (event.data instanceof ArrayBuffer) {
-            // Message is raw audio (binary PCM/Opus)
+          if (data.text) {
+            setLastTextMessage(data.text);
+          }
+
+          if (data.audio) {
+            console.log("Received audio data");
             try {
               const audioContext = initAudioContext();
-              const audioBuffer = await audioContext.decodeAudioData(event.data);
+              console.log("Audio context initialized:", audioContext.state);
+
+              // Decode base64 audio data
+              const audioData = Base64.toUint8Array(data.audio);
+              console.log("Decoded audio data length:", audioData.length);
+
+              // Create audio buffer from raw data
+              const audioBuffer = await audioContext.decodeAudioData(audioData.buffer);
+              console.log("Created audio buffer:", audioBuffer.duration, "seconds");
+
+              // Create and configure source node
               const source = audioContext.createBufferSource();
               source.buffer = audioBuffer;
+
+              // Create and configure gain node for volume control
               const gainNode = audioContext.createGain();
-              gainNode.gain.value = 1.0;
+              gainNode.gain.value = 1.0; // Increase volume
+
+              // Connect nodes
               source.connect(gainNode);
               gainNode.connect(audioContext.destination);
-      
+
+              // Store the current source
               if (currentAudioSourceRef.current) {
                 currentAudioSourceRef.current.stop();
               }
-      
               currentAudioSourceRef.current = source;
+
+              // Play the audio
               source.start(0);
-              console.log("Played raw audio buffer");
-            } catch (err) {
-              console.error("Error decoding raw binary audio:", err);
+              console.log("Started audio playback");
+
+              // Update state
+              setLastAudioData(data.audio);
+            } catch (error) {
+              console.error("Error playing audio:", error);
+              console.error(error.stack);
             }
-          } else {
-            console.warn("Unknown message type from WebSocket:", event.data);
+          }
+
+          if (data.transcription) {
+            setLastTranscription(data.transcription);
+          }
+
+          // Handle tool responses
+          if (data.tool_response) {
+            handleToolCalls(data.tool_response);
           }
         } catch (error) {
           console.error("Error handling WebSocket message:", error);
         }
       };
-
-      
     } catch (error) {
       console.error("WebSocket connection error:", error);
       reconnect();

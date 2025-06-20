@@ -135,31 +135,30 @@ pnpm dev
 
 ---
 
-## Known Issues & Troubleshooting
+## Future Fix: Known Issues & Troubleshooting
 
-### 1. **Bar Chart/Line Chart/Pie Chart Not Displaying**
-- **Symptom**: You send "bar chart: 1,2,3" but see no image or get an audio error.
-- **Cause**: The frontend may try to decode all incoming messages as audio, even if they are images. Only decode `audio` fields as audio.
-- **Fix**: Update your WebSocket handler to only decode audio if the message contains a valid `audio` field. Chart images are sent as `barchart`, `linechart`, etc.
+1. **Bar Chart/Line Chart/Pie Chart Not Displaying**
+   - **Symptom:** You send "bar chart: 1,2,3" but see no image or get an audio error.
+   - **Cause:** The frontend may try to decode all incoming messages as audio, even if they are images. Only decode audio fields as audio.
+   - **Fix:** Update your WebSocket handler to only decode audio if the message contains a valid audio field. Chart images are sent as barchart, linechart, etc.
 
-### 2. **WebSocket Disconnected**
-- **Symptom**: "WebSocket: Disconnected" in UI.
-- **Cause**: Backend not running, wrong port, or CORS issue.
-- **Fix**: Ensure backend is running on `ws://localhost:9084` and CORS is allowed.
+2. **WebSocket Disconnected**
+   - **Symptom:** "WebSocket: Disconnected" in UI.
+   - **Cause:** Backend not running, wrong port, or CORS issue.
+   - **Fix:** Ensure backend is running on ws://localhost:9084 and CORS is allowed.
 
-### 3. **No Memory Response**
-- **Symptom**: Memory commands sent, but no response in log.
-- **Cause**: Backend not restarted after code changes, or import error in `live_api.py`.
-- **Fix**: Restart backend, check for errors in terminal, ensure `from memory import ...` is correct.
+3. **No Memory Response**
+   - **Symptom:** Memory commands sent, but no response in log.
+   - **Cause:** Backend not restarted after code changes, or import error in live_api.py.
+   - **Fix:** Restart backend, check for errors in terminal, ensure from memory import ... is correct.
 
+5. **Audio Decoding Errors**
+   - **Symptom:** "Error playing audio: EncodingError: Unable to decode audio data"
+   - **Cause:** Frontend tries to decode non-audio messages as audio.
+   - **Fix:** See #1 above.
 
-### 5. **Audio Decoding Errors**
-- **Symptom**: "Error playing audio: EncodingError: Unable to decode audio data"
-- **Cause**: Frontend tries to decode non-audio messages as audio.
-- **Fix**: See #1 above.
-
-### 6. **Chart/Wordcloud REST API Not Used**
-- **Note**: The FastAPI `chart_api.py` is provided for direct REST access to chart/wordcloud generation, but the main chat UI uses the WebSocket backend for tool calls.
+6. **Chart/Wordcloud REST API Not Used**
+   - **Note:** The FastAPI chart_api.py is provided for direct REST access to chart/wordcloud generation, but the main chat UI uses the WebSocket backend for tool calls.
 
 ---
 
